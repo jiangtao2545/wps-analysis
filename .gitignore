@@ -1,0 +1,17 @@
+target/
+*.class
+*.jar
+*.war
+
+# IDE files
+.idea/
+*.iml
+.vscode/
+*.eclipse
+
+# Maven wrapper
+.mvn/
+
+# OS files
+.DS_Store
+Thumbs.db
