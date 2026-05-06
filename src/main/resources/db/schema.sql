@@ -179,6 +179,33 @@ VALUES (1001, 10001, 100, 1, '张三', 'zhangsan', 'zhangsan@example.com', 'zhan
         '', '', '', '', '', 0, '', '', '', '', '', '', ''),
        (1006, 10006, 100, 3, '周八', 'zhouba', 'zhouba@example.com', 'zhouba@example.com',
         '13800000006', 'active', 1, UNIX_TIMESTAMP(), UNIX_TIMESTAMP(),
+        '', '', '', '', '', 0, '', '', '', '', '', '', ''),
+       (1007, 10007, 100, 2, '吴九', 'wujiu', 'wujiu@example.com', 'wujiu@example.com',
+        '13800000007', 'active', 1, UNIX_TIMESTAMP(), UNIX_TIMESTAMP(),
+        '', '', '', '', '', 0, '', '', '', '', '', '', ''),
+       (1008, 10008, 100, 4, '郑十', 'zhengshi', 'zhengshi@example.com', 'zhengshi@example.com',
+        '13800000008', 'active', 1, UNIX_TIMESTAMP(), UNIX_TIMESTAMP(),
+        '', '', '', '', '', 0, '', '', '', '', '', '', ''),
+       (1009, 10009, 100, 1, '王一', 'wangyi', 'wangyi@example.com', 'wangyi@example.com',
+        '13800000009', 'active', 1, UNIX_TIMESTAMP(), UNIX_TIMESTAMP(),
+        '', '', '', '', '', 0, '', '', '', '', '', '', ''),
+       (1010, 10010, 100, 3, '李二', 'lier', 'lier@example.com', 'lier@example.com',
+        '13800000010', 'active', 1, UNIX_TIMESTAMP(), UNIX_TIMESTAMP(),
+        '', '', '', '', '', 0, '', '', '', '', '', '', ''),
+       (1011, 10011, 100, 3, '展三', 'zhansan', 'zhansan@example.com', 'zhansan@example.com',
+        '13800000011', 'active', 1, UNIX_TIMESTAMP(), UNIX_TIMESTAMP(),
+        '', '', '', '', '', 0, '', '', '', '', '', '', ''),
+       (1012, 10012, 100, 2, '李四二', 'lisi2', 'lisi2@example.com', 'lisi2@example.com',
+        '13800000012', 'active', 1, UNIX_TIMESTAMP(), UNIX_TIMESTAMP(),
+        '', '', '', '', '', 0, '', '', '', '', '', '', ''),
+       (1013, 10013, 100, 4, '王五二', 'wangwu2', 'wangwu2@example.com', 'wangwu2@example.com',
+        '13800000013', 'active', 1, UNIX_TIMESTAMP(), UNIX_TIMESTAMP(),
+        '', '', '', '', '', 0, '', '', '', '', '', '', ''),
+       (1014, 10014, 100, 1, '赵六二', 'zhaoliu2', 'zhaoliu2@example.com', 'zhaoliu2@example.com',
+        '13800000014', 'active', 1, UNIX_TIMESTAMP(), UNIX_TIMESTAMP(),
+        '', '', '', '', '', 0, '', '', '', '', '', '', ''),
+       (1015, 10015, 100, 3, '孙七二', 'sunqi2', 'sunqi2@example.com', 'sunqi2@example.com',
+        '13800000015', 'active', 1, UNIX_TIMESTAMP(), UNIX_TIMESTAMP(),
         '', '', '', '', '', 0, '', '', '', '', '', '', '');
 
 -- =====================================================
@@ -205,6 +232,35 @@ VALUES (100, 1, '/1', '测试文档1.docx', 1, '127.0.0.1', '{}',
         UNIX_TIMESTAMP('2025-01-20 14:00:00') * 1000, 'VIEW',
         'zhangsan@example.com', 10001, '张三', 'PC');
 
+-- 2025年1月日志（补充数据，共新增8条，各公司合计不超过人员上限）
+INSERT INTO `log_doc_2025_01` (`comp_id`, `ext_id`, `dept_id_path`, `file_name`, `group_id`,
+                                `ip_addr`, `meta_data`, `operation_time`, `operation_type`,
+                                `operator_email`, `operator_id`, `operator_name`, `platform_type`)
+VALUES (100, 1, '/1', '季度报告.docx', 1, '127.0.0.1', '{}',
+        UNIX_TIMESTAMP('2025-01-05 09:00:00') * 1000, 'EDIT',
+        'wangyi@example.com', 10009, '王一', 'PC'),
+       (100, 3, '/3', '项目进展.xlsx', 3, '127.0.0.1', '{}',
+        UNIX_TIMESTAMP('2025-01-07 10:00:00') * 1000, 'VIEW',
+        'sunqi@example.com', 10005, '孙七', 'PC'),
+       (100, 3, '/3', '市场分析.pptx', 3, '127.0.0.1', '{}',
+        UNIX_TIMESTAMP('2025-01-08 11:00:00') * 1000, 'VIEW',
+        'lier@example.com', 10010, '李二', 'MOBILE'),
+       (100, 3, '/3', '工作计划.docx', 3, '127.0.0.1', '{}',
+        UNIX_TIMESTAMP('2025-01-10 14:00:00') * 1000, 'DOWNLOAD',
+        'sunqi2@example.com', 10015, '孙七二', 'PC'),
+       (100, 2, '/2', '技术文档.docx', 2, '127.0.0.1', '{}',
+        UNIX_TIMESTAMP('2025-01-12 09:30:00') * 1000, 'VIEW',
+        'wujiu@example.com', 10007, '吴九', 'MOBILE'),
+       (100, 2, '/2', '接口文档.docx', 2, '127.0.0.1', '{}',
+        UNIX_TIMESTAMP('2025-01-14 15:00:00') * 1000, 'EDIT',
+        'lisi2@example.com', 10012, '李四二', 'PC'),
+       (100, 3, '/3', '会议纪要.docx', 3, '127.0.0.1', '{}',
+        UNIX_TIMESTAMP('2025-01-22 10:00:00') * 1000, 'VIEW',
+        'zhouba@example.com', 10006, '周八', 'PC'),
+       (100, 3, '/3', '合同文件.docx', 3, '127.0.0.1', '{}',
+        UNIX_TIMESTAMP('2025-01-25 16:00:00') * 1000, 'DOWNLOAD',
+        'zhansan@example.com', 10011, '展三', 'MOBILE');
+
 -- 2025年2月日志
 INSERT INTO `log_doc_2025_02` (`comp_id`, `ext_id`, `dept_id_path`, `file_name`, `group_id`,
                                 `ip_addr`, `meta_data`, `operation_time`, `operation_type`,
@@ -218,5 +274,39 @@ VALUES (100, 1, '/1', '测试文档A.docx', 1, '127.0.0.1', '{}',
        (100, 3, '/3', '测试文档C.docx', 3, '127.0.0.1', '{}',
         UNIX_TIMESTAMP('2025-02-14 12:00:00') * 1000, 'DOWNLOAD',
         'zhouba@example.com', 10006, '周八', 'MOBILE');
+
+-- 2025年2月日志（补充数据，共新增5条，各公司合计不超过人员上限）
+INSERT INTO `log_doc_2025_02` (`comp_id`, `ext_id`, `dept_id_path`, `file_name`, `group_id`,
+                                `ip_addr`, `meta_data`, `operation_time`, `operation_type`,
+                                `operator_email`, `operator_id`, `operator_name`, `platform_type`)
+VALUES (100, 2, '/2', '月度报表.xlsx', 2, '127.0.0.1', '{}',
+        UNIX_TIMESTAMP('2025-02-05 09:00:00') * 1000, 'VIEW',
+        'zhaoliu@example.com', 10004, '赵六', 'PC'),
+       (100, 1, '/1', '季度规划.docx', 1, '127.0.0.1', '{}',
+        UNIX_TIMESTAMP('2025-02-07 10:30:00') * 1000, 'EDIT',
+        'wangyi@example.com', 10009, '王一', 'PC'),
+       (100, 1, '/1', '财务报告.docx', 1, '127.0.0.1', '{}',
+        UNIX_TIMESTAMP('2025-02-15 14:00:00') * 1000, 'VIEW',
+        'lisi@example.com', 10002, '李四', 'MOBILE'),
+       (100, 3, '/3', '销售数据.xlsx', 3, '127.0.0.1', '{}',
+        UNIX_TIMESTAMP('2025-02-18 11:00:00') * 1000, 'DOWNLOAD',
+        'sunqi2@example.com', 10015, '孙七二', 'PC'),
+       (100, 2, '/2', '研发周报.docx', 2, '127.0.0.1', '{}',
+        UNIX_TIMESTAMP('2025-02-20 16:00:00') * 1000, 'EDIT',
+        'wangwu@example.com', 10003, '王五', 'PC');
+
+-- 2025年3月日志（新增3条，各公司合计不超过人员上限）
+INSERT INTO `log_doc_2025_03` (`comp_id`, `ext_id`, `dept_id_path`, `file_name`, `group_id`,
+                                `ip_addr`, `meta_data`, `operation_time`, `operation_type`,
+                                `operator_email`, `operator_id`, `operator_name`, `platform_type`)
+VALUES (100, 1, '/1', '年度总结.docx', 1, '127.0.0.1', '{}',
+        UNIX_TIMESTAMP('2025-03-05 10:00:00') * 1000, 'VIEW',
+        'zhangsan@example.com', 10001, '张三', 'PC'),
+       (100, 3, '/3', '业务拓展计划.docx', 3, '127.0.0.1', '{}',
+        UNIX_TIMESTAMP('2025-03-10 14:00:00') * 1000, 'EDIT',
+        'sunqi@example.com', 10005, '孙七', 'MOBILE'),
+       (100, 2, '/2', '开发规范.docx', 2, '127.0.0.1', '{}',
+        UNIX_TIMESTAMP('2025-03-15 09:30:00') * 1000, 'VIEW',
+        'wujiu@example.com', 10007, '吴九', 'PC');
 
 SET FOREIGN_KEY_CHECKS = 1;
