@@ -42,4 +42,11 @@ public interface CsvService {
      * @return loginName列表
      */
     List<String> getAllLoginNames();
+
+    /**
+     * 获取各二级公司的人员上限（基于CSV中的唯一loginname计数）
+     *
+     * @return company -> headcount上限
+     */
+    Map<String, Integer> getCompanyHeadcounts();
 }

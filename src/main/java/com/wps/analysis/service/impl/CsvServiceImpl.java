@@ -30,6 +30,9 @@ public class CsvServiceImpl implements CsvService {
     /** 所有二级公司列表（保序去重） */
     private volatile List<String> companies = new ArrayList<>();
 
+    /** company -> headcount上限（按唯一loginname计数） */
+    private volatile Map<String, Integer> companyHeadcounts = new ConcurrentHashMap<>();
+
     @PostConstruct
     @Override
     public synchronized void reload() {
@@ -83,6 +86,11 @@ public class CsvServiceImpl implements CsvService {
                 // 原子替换缓存
                 this.loginNameToCompany = new ConcurrentHashMap<>(newMapping);
                 this.companies = new ArrayList<>(newCompanies);
+                Map<String, Integer> newHeadcounts = new LinkedHashMap<>();
+                for (Map.Entry<String, String> entry : newMapping.entrySet()) {
+                    newHeadcounts.merge(entry.getValue(), 1, Integer::sum);
+                }
+                this.companyHeadcounts = new ConcurrentHashMap<>(newHeadcounts);
                 log.info("CSV加载完成，共加载 {} 条记录，二级公司数量：{}", count, newCompanies.size());
             }
 
@@ -110,6 +118,11 @@ public class CsvServiceImpl implements CsvService {
     @Override
     public List<String> getAllLoginNames() {
         return new ArrayList<>(loginNameToCompany.keySet());
+    }
+
+    @Override
+    public Map<String, Integer> getCompanyHeadcounts() {
+        return Collections.unmodifiableMap(companyHeadcounts);
     }
 
     /**

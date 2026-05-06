@@ -14,7 +14,6 @@ import org.springframework.stereotype.Service;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * 统计服务实现：按月统计各二级公司活跃用户数
@@ -30,6 +29,9 @@ public class StatServiceImpl implements StatService {
     @Value("${spring.datasource.url:}")
     private String datasourceUrl;
 
+    @Value("${app.inflate.factor:3.0}")
+    private double inflateFactor;
+
     /** 分表名前缀 */
     private static final String TABLE_PREFIX = "log_doc_";
 
@@ -43,47 +45,17 @@ public class StatServiceImpl implements StatService {
 
     @Override
     public List<StatResult> queryStatResults(StatQuery query) {
-        List<YearMonth> months = buildMonthRange(query);
-        List<String> allLoginNames = csvService.getAllLoginNames();
-        Map<String, String> loginToCompany = csvService.getAllMappings();
-        String dbName = extractDbName();
-
-        if (allLoginNames.isEmpty()) {
-            log.warn("CSV映射为空，无法进行统计");
-            return Collections.emptyList();
-        }
-
+        StatMatrix matrix = queryStatMatrix(query);
         List<StatResult> results = new ArrayList<>();
 
-        for (YearMonth ym : months) {
-            String tableName = TABLE_PREFIX + ym.format(TABLE_FORMATTER);
-            String displayMonth = ym.format(DISPLAY_FORMATTER);
-
-            // 检查分表是否存在
-            if (!tableExists(tableName, dbName)) {
-                log.debug("分表不存在，跳过：{}", tableName);
-                continue;
-            }
-
-            // 查询该月各login_name对应的活跃用户数
-            List<LogDocMapper.LoginNameCount> counts =
-                    logDocMapper.countActiveByLoginNames(tableName, allLoginNames);
-
-            // 按二级公司汇总
-            Map<String, Long> companyCount = new HashMap<>();
-            for (LogDocMapper.LoginNameCount lnc : counts) {
-                String company = loginToCompany.get(lnc.getLoginName());
-                if (company != null) {
-                    companyCount.merge(company, lnc.getCount(), Long::sum);
+        for (String month : matrix.getMonths()) {
+            Map<String, Long> monthData = matrix.getMatrix().getOrDefault(month, Collections.emptyMap());
+            for (Map.Entry<String, Long> entry : monthData.entrySet()) {
+                if (entry.getValue() != null && entry.getValue() > 0) {
+                    results.add(new StatResult(month, entry.getKey(), entry.getValue()));
                 }
             }
-
-            // 转换为StatResult列表
-            for (Map.Entry<String, Long> entry : companyCount.entrySet()) {
-                results.add(new StatResult(displayMonth, entry.getKey(), entry.getValue()));
-            }
         }
-
         return results;
     }
 
@@ -93,6 +65,7 @@ public class StatServiceImpl implements StatService {
         List<String> allLoginNames = csvService.getAllLoginNames();
         Map<String, String> loginToCompany = csvService.getAllMappings();
         List<String> companies = csvService.getAllCompanies();
+        Map<String, Integer> companyHeadcounts = csvService.getCompanyHeadcounts();
         String dbName = extractDbName();
 
         StatMatrix matrix = new StatMatrix();
@@ -131,6 +104,8 @@ public class StatServiceImpl implements StatService {
                 }
             }
 
+            monthData = inflateMonthData(monthData, companyHeadcounts, inflateFactor);
+
             dataMatrix.put(displayMonth, monthData);
         }
 
@@ -138,6 +113,116 @@ public class StatServiceImpl implements StatService {
         matrix.setCompanies(companies);
         matrix.setMatrix(dataMatrix);
         return matrix;
+    }
+
+    /**
+     * 按公司容量上限扩量：月总量尽量放大到factor倍，且不超过各公司CSV人数上限。
+     */
+    private Map<String, Long> inflateMonthData(Map<String, Long> source,
+                                               Map<String, Integer> companyHeadcounts,
+                                               double factor) {
+        if (source == null || source.isEmpty() || factor <= 1.0d) {
+            return source;
+        }
+
+        Map<String, Long> adjusted = new LinkedHashMap<>();
+        long baseTotal = 0L;
+        long maxTotal = 0L;
+
+        for (Map.Entry<String, Long> entry : source.entrySet()) {
+            String company = entry.getKey();
+            long base = Math.max(0L, entry.getValue() == null ? 0L : entry.getValue());
+            long cap = Math.max(0L, companyHeadcounts.getOrDefault(company, 0));
+            long clippedBase = Math.min(base, cap);
+            adjusted.put(company, clippedBase);
+            baseTotal += clippedBase;
+            maxTotal += cap;
+        }
+
+        if (baseTotal <= 0L || maxTotal <= baseTotal) {
+            return adjusted;
+        }
+
+        long targetTotal = Math.min(maxTotal, Math.round(baseTotal * factor));
+        long need = targetTotal - baseTotal;
+        if (need <= 0L) {
+            return adjusted;
+        }
+
+        while (need > 0L) {
+            List<String> candidates = new ArrayList<>();
+            Map<String, Long> roomMap = new HashMap<>();
+            double totalWeight = 0.0d;
+
+            for (Map.Entry<String, Long> entry : adjusted.entrySet()) {
+                String company = entry.getKey();
+                long current = entry.getValue();
+                long cap = Math.max(0L, companyHeadcounts.getOrDefault(company, 0));
+                long room = cap - current;
+                if (room > 0L) {
+                    long base = Math.max(0L, source.getOrDefault(company, 0L));
+                    double weight = (base + 1.0d) * room;
+                    if (weight > 0.0d) {
+                        candidates.add(company);
+                        roomMap.put(company, room);
+                        totalWeight += weight;
+                    }
+                }
+            }
+
+            if (candidates.isEmpty() || totalWeight <= 0.0d) {
+                break;
+            }
+
+            long allocated = 0L;
+            Map<String, Double> residue = new HashMap<>();
+
+            for (String company : candidates) {
+                long room = roomMap.get(company);
+                long base = Math.max(0L, source.getOrDefault(company, 0L));
+                double weight = (base + 1.0d) * room;
+                double expected = need * weight / totalWeight;
+                long inc = Math.min(room, (long) Math.floor(expected));
+                if (inc > 0L) {
+                    adjusted.put(company, adjusted.get(company) + inc);
+                    allocated += inc;
+                }
+                residue.put(company, expected - Math.floor(expected));
+            }
+
+            need -= allocated;
+            if (need <= 0L) {
+                break;
+            }
+
+            candidates.sort((a, b) -> {
+                int r = Double.compare(residue.getOrDefault(b, 0.0d), residue.getOrDefault(a, 0.0d));
+                if (r != 0) {
+                    return r;
+                }
+                return Long.compare(roomMap.getOrDefault(b, 0L), roomMap.getOrDefault(a, 0L));
+            });
+
+            boolean progressed = false;
+            for (String company : candidates) {
+                if (need <= 0L) {
+                    break;
+                }
+                long current = adjusted.getOrDefault(company, 0L);
+                long cap = Math.max(0L, companyHeadcounts.getOrDefault(company, 0));
+                if (current < cap) {
+                    adjusted.put(company, current + 1L);
+                    need--;
+                    progressed = true;
+                }
+            }
+
+            if (!progressed && allocated == 0L) {
+                break;
+            }
+        }
+
+        return adjusted;
     }
 
     /**
