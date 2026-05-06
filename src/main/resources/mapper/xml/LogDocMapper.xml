@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wps.analysis.mapper.LogDocMapper">
+
+    <!--
+        查询指定分表中，operator_id关联用户表后login_name在给定列表内的去重operator_id数量。
+        使用 ${tableName} 动态拼接分表名，loginNames 通过 foreach 拼接。
+    -->
+    <select id="queryActiveLoginNames" resultType="string">
+        SELECT DISTINCT u.login_name
+        FROM `${tableName}` ld
+        INNER JOIN `user` u ON ld.operator_id = u.userid
+        WHERE u.login_name IN
+        <foreach collection="loginNames" item="ln" open="(" separator="," close=")">
+            #{ln}
+        </foreach>
+    </select>
+
+    <!--
+        按login_name分组统计指定分表中各login_name对应的去重operator_id数量。
+        统计口径：每个login_name（即每个用户）在该月有日志记录则计入。
+        这里实际统计的是：对应每个login_name关联的userid在该分表中产生日志的去重用户数量。
+    -->
+    <select id="countActiveByLoginNames"
+            resultType="com.wps.analysis.mapper.LogDocMapper$LoginNameCount">
+        SELECT u.login_name AS loginName, COUNT(DISTINCT ld.operator_id) AS count
+        FROM `${tableName}` ld
+        INNER JOIN `user` u ON ld.operator_id = u.userid
+        WHERE u.login_name IN
+        <foreach collection="loginNames" item="ln" open="(" separator="," close=")">
+            #{ln}
+        </foreach>
+        GROUP BY u.login_name
+    </select>
+
+    <!--
+        检查分表是否存在（查information_schema）
+    -->
+    <select id="checkTableExists" resultType="int">
+        SELECT COUNT(1)
+        FROM information_schema.TABLES
+        WHERE TABLE_SCHEMA = #{dbName}
+          AND TABLE_NAME = #{tableName}
+    </select>
+
+</mapper>
