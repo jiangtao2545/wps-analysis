@@ -6,7 +6,7 @@
 ### 1. 文档操作日志表（分表存储）
 - 表名规则：`log_doc_yyyy_MM`（按自然月分表，如 log_doc_2025_06、log_doc_2025_07）
 - 核心关联字段：`operator_id` = 用户表 `userid`（一一对应）
-- 核心关键字段：企业ID(`comp_id`)、操作人ID(`operator_id`)、操作时间(`operation_time`)、操作类型等
+- 核心关键字段：操作人ID(`operator_id`)、操作时间(`operation_time`)、操作类型等
 - 主键：`id`；索引：`idx_c(comp_id)`
 
 ### 2. 用户表
