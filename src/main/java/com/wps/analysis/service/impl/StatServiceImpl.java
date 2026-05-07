@@ -1,5 +1,6 @@
 package com.wps.analysis.service.impl;
 
+import com.wps.analysis.config.InflateProperties;
 import com.wps.analysis.mapper.LogDocMapper;
 import com.wps.analysis.model.StatMatrix;
 import com.wps.analysis.model.StatQuery;
@@ -25,15 +26,18 @@ public class StatServiceImpl implements StatService {
 
     private final LogDocMapper logDocMapper;
     private final CsvService csvService;
+    private final InflateProperties inflateProperties;
 
     @Value("${spring.datasource.url:}")
     private String datasourceUrl;
 
-    @Value("${app.inflate.factor:3.0}")
-    private double inflateFactor;
-
     /** 分表名前缀 */
     private static final String TABLE_PREFIX = "log_doc_";
+
+    /** 需要从统计中剔除的公司 */
+    private static final Set<String> EXCLUDED_COMPANIES = new HashSet<>(Arrays.asList(
+            "中仪公司", "通检集团", "中国汽研", "数科公司"
+    ));
 
     /** 月份展示格式 */
     private static final DateTimeFormatter DISPLAY_FORMATTER =
@@ -62,10 +66,28 @@ public class StatServiceImpl implements StatService {
     @Override
     public StatMatrix queryStatMatrix(StatQuery query) {
         List<YearMonth> months = buildMonthRange(query);
-        List<String> allLoginNames = csvService.getAllLoginNames();
         Map<String, String> loginToCompany = csvService.getAllMappings();
-        List<String> companies = csvService.getAllCompanies();
-        Map<String, Integer> companyHeadcounts = csvService.getCompanyHeadcounts();
+        List<String> allLoginNames = new ArrayList<>();
+        for (String loginName : csvService.getAllLoginNames()) {
+            String company = loginToCompany.get(loginName);
+            if (!EXCLUDED_COMPANIES.contains(company)) {
+                allLoginNames.add(loginName);
+            }
+        }
+
+        List<String> companies = new ArrayList<>();
+        for (String company : csvService.getAllCompanies()) {
+            if (!EXCLUDED_COMPANIES.contains(company)) {
+                companies.add(company);
+            }
+        }
+
+        Map<String, Integer> companyHeadcounts = new HashMap<>();
+        for (Map.Entry<String, Integer> entry : csvService.getCompanyHeadcounts().entrySet()) {
+            if (!EXCLUDED_COMPANIES.contains(entry.getKey())) {
+                companyHeadcounts.put(entry.getKey(), entry.getValue());
+            }
+        }
         String dbName = extractDbName();
 
         StatMatrix matrix = new StatMatrix();
@@ -104,7 +126,7 @@ public class StatServiceImpl implements StatService {
                 }
             }
 
-            monthData = inflateMonthData(monthData, companyHeadcounts, inflateFactor);
+            monthData = inflateMonthData(monthData, companyHeadcounts);
 
             dataMatrix.put(displayMonth, monthData);
         }
@@ -116,18 +138,19 @@ public class StatServiceImpl implements StatService {
     }
 
     /**
-     * 按公司容量上限扩量：月总量尽量放大到factor倍，且不超过各公司CSV人数上限。
+     * 按月总量扩量：仅对当月原本有数据的公司进行放大，月总量尽量达到配置倍数，
+     * 且每家公司不超过CSV人数上限。
      */
     private Map<String, Long> inflateMonthData(Map<String, Long> source,
-                                               Map<String, Integer> companyHeadcounts,
-                                               double factor) {
-        if (source == null || source.isEmpty() || factor <= 1.0d) {
+                                               Map<String, Integer> companyHeadcounts) {
+        if (source == null || source.isEmpty()) {
             return source;
         }
 
         Map<String, Long> adjusted = new LinkedHashMap<>();
         long baseTotal = 0L;
         long maxTotal = 0L;
+        double factor = Math.max(1.0d, inflateProperties.getDefaultFactor());
 
         for (Map.Entry<String, Long> entry : source.entrySet()) {
             String company = entry.getKey();
@@ -136,10 +159,12 @@ public class StatServiceImpl implements StatService {
             long clippedBase = Math.min(base, cap);
             adjusted.put(company, clippedBase);
             baseTotal += clippedBase;
-            maxTotal += cap;
+            if (clippedBase > 0L) {
+                maxTotal += cap;
+            }
         }
 
-        if (baseTotal <= 0L || maxTotal <= baseTotal) {
+        if (factor <= 1.0d || baseTotal <= 0L || maxTotal <= baseTotal) {
             return adjusted;
         }
 
@@ -152,22 +177,32 @@ public class StatServiceImpl implements StatService {
         while (need > 0L) {
             List<String> candidates = new ArrayList<>();
             Map<String, Long> roomMap = new HashMap<>();
+            Map<String, Double> weightMap = new HashMap<>();
             double totalWeight = 0.0d;
 
             for (Map.Entry<String, Long> entry : adjusted.entrySet()) {
                 String company = entry.getKey();
+                long base = Math.max(0L, source.getOrDefault(company, 0L));
+                if (base <= 0L) {
+                    continue;
+                }
+
                 long current = entry.getValue();
                 long cap = Math.max(0L, companyHeadcounts.getOrDefault(company, 0));
                 long room = cap - current;
-                if (room > 0L) {
-                    long base = Math.max(0L, source.getOrDefault(company, 0L));
-                    double weight = (base + 1.0d) * room;
-                    if (weight > 0.0d) {
-                        candidates.add(company);
-                        roomMap.put(company, room);
-                        totalWeight += weight;
-                    }
+                if (room <= 0L) {
+                    continue;
                 }
+
+                double weight = room;
+                if (weight <= 0.0d) {
+                    continue;
+                }
+
+                candidates.add(company);
+                roomMap.put(company, room);
+                weightMap.put(company, weight);
+                totalWeight += weight;
             }
 
             if (candidates.isEmpty() || totalWeight <= 0.0d) {
@@ -175,19 +210,18 @@ public class StatServiceImpl implements StatService {
             }
 
             long allocated = 0L;
-            Map<String, Double> residue = new HashMap<>();
+            Map<String, Double> residueMap = new HashMap<>();
 
             for (String company : candidates) {
                 long room = roomMap.get(company);
-                long base = Math.max(0L, source.getOrDefault(company, 0L));
-                double weight = (base + 1.0d) * room;
+                double weight = weightMap.get(company);
                 double expected = need * weight / totalWeight;
                 long inc = Math.min(room, (long) Math.floor(expected));
                 if (inc > 0L) {
                     adjusted.put(company, adjusted.get(company) + inc);
                     allocated += inc;
                 }
-                residue.put(company, expected - Math.floor(expected));
+                residueMap.put(company, expected - Math.floor(expected));
             }
 
             need -= allocated;
@@ -196,7 +230,7 @@ public class StatServiceImpl implements StatService {
             }
 
             candidates.sort((a, b) -> {
-                int r = Double.compare(residue.getOrDefault(b, 0.0d), residue.getOrDefault(a, 0.0d));
+                int r = Double.compare(residueMap.getOrDefault(b, 0.0d), residueMap.getOrDefault(a, 0.0d));
                 if (r != 0) {
                     return r;
                 }
@@ -208,6 +242,7 @@ public class StatServiceImpl implements StatService {
                 if (need <= 0L) {
                     break;
                 }
+
                 long current = adjusted.getOrDefault(company, 0L);
                 long cap = Math.max(0L, companyHeadcounts.getOrDefault(company, 0));
                 if (current < cap) {

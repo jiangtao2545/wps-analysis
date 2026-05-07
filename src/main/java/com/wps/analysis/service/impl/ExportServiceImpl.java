@@ -84,7 +84,7 @@ public class ExportServiceImpl implements ExportService {
 
     /**
      * 构建动态表头（单行表头）
-     * 第一列：月份；后续列：各二级公司名称
+     * 第一列：月份；中间列：各二级公司名称；最后一列：总数
      */
     private List<List<String>> buildHead(List<String> companies) {
         List<List<String>> head = new ArrayList<>();
@@ -92,12 +92,13 @@ public class ExportServiceImpl implements ExportService {
         for (String company : companies) {
             head.add(Collections.singletonList(company));
         }
+        head.add(Collections.singletonList("总数"));
         return head;
     }
 
     /**
      * 构建数据行
-     * 每行：月份显示值 + 各公司用户数（无数据填0）
+     * 每行：月份显示值 + 各公司用户数（无数据填0）+ 行总数
      */
     private List<List<Object>> buildDataRows(List<String> months,
                                               List<String> companies,
@@ -107,9 +108,13 @@ public class ExportServiceImpl implements ExportService {
             List<Object> row = new ArrayList<>();
             row.add(month);
             Map<String, Long> companyData = dataMatrix.getOrDefault(month, Collections.emptyMap());
+            long total = 0L;
             for (String company : companies) {
-                row.add(companyData.getOrDefault(company, 0L));
+                long value = companyData.getOrDefault(company, 0L);
+                row.add(value);
+                total += value;
             }
+            row.add(total);
             rows.add(row);
         }
         return rows;

@@ -7,7 +7,7 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://10.152.160.27:62112/wps_plus_core?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
     username: wps
-    password: Kingsoft&831
+    password:
     druid:
       initial-size: 5
       min-idle: 5
@@ -36,3 +36,6 @@ logging:
 app:
   # CSV文件路径（相对路径或绝对路径）
   csv-file-path: classpath:公司表.csv
+  inflate:
+    # 月总量扩量倍数
+    default-factor: 3.0
